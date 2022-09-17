@@ -5,7 +5,9 @@ import (
 	"calfutures/calcoper"
 	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"strings"
+	"net/http"
 )
 
 func expcode(resp []byte)(resstr string){
@@ -20,10 +22,10 @@ func expcode(resp []byte)(resstr string){
 //	fmt.Println(resstr)
 	return resstr
 }
-func main() {
+func calfutures(c *gin.Context) {
 	resp,err:=getsinadata.GetCode()
 	if err!=nil{return}
-	fmt.Println(string(resp))
+	//fmt.Println(string(resp))
 	resstr:=expcode(resp) //获取估值期货代码IC0,IC2205,IC2206,IC2212,
 	resdetail,err:=getsinadata.GetCodeValue(resstr)
 	strarr:=strings.Split(resdetail,";")
@@ -32,24 +34,36 @@ func main() {
 	for _,strtmp:=range strarr{
 		detail:=strings.Split(strtmp,",")
 		fsd:=calcoper.Calcstruct(detail)
-		if fsd.Code !="0" && fsd.Code !="IC0"{
+		if fsd.Code !="0"{
 			details=append(details, fsd)
 		}
 	}
-	fmt.Println("接口获取的详细数据: \n",details)
+//	fmt.Println("接口获取的详细数据: \n",details)
 	basedetail,errint:=calcoper.FindBase(details)
 	if errint==-1{
 		fmt.Println("未找到当月期指")
 		return
 	}
-	fmt.Println("计算结果:")
+	//fmt.Println("计算结果:")
+	c.HTML(http.StatusOK,"head.html",gin.H{})
 	for _,detail:=range details{
 		if !detail.Isbase{
 			daynum,revenue:=calcoper.CalcRevenue(basedetail,detail)
-			fmt.Printf("期指:%s  最新报价:%.02f 交割日期:%s 间隔天数:%d 每日收益%.02f\n",
-				detail.Code,detail.Price,detail.Tradeday.Format("20060102"),daynum,revenue)
+			contentstr:=fmt.Sprintf("期指: %s  最新报价： %.02f  间隔天数：%d 每日收益%.02f\n",
+				detail.Code,detail.Price,daynum,revenue)
+			c.HTML(http.StatusOK,"content.html",gin.H{"content":contentstr})
 		}else{
-			fmt.Printf("期指当前月:%s  最新报价:%.02f 交割日期:%s\n",detail.Code,detail.Price,detail.Tradeday.Format("20060102"))
+			contentstr:=fmt.Sprintf("期指当前月: %s  最新报价： %.02f\n",detail.Code,detail.Price)
+			c.HTML(http.StatusOK,"content.html",gin.H{"content":contentstr})
 		}
 	}
+	c.HTML(http.StatusOK,"tail.html",gin.H{})
+}
+
+func main() {
+	route:=gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	route.LoadHTMLGlob("./html/*")
+	route.GET("/calfutures",calfutures)
+	route.Run(":18838")
 }
