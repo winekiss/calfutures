@@ -17,11 +17,13 @@ func GetCode()(body []byte,err error){
 	resp,err:=http.Get(url)
 	if err!=nil{
 		fmt.Println("无法获取期指代码:",err.Error())
+		return body,err
 	}
 	defer resp.Body.Close()
 	body,err=ioutil.ReadAll(resp.Body)
 	if err!=nil{
 		fmt.Println("无法获取期指代码：",err.Error())
+		return body,err
 	}
 	return body,err
 }
